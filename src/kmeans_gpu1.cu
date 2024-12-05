@@ -5,13 +5,7 @@
 #include "../include/kmeans_gpu1.cuh"
 #include <iostream>
 
-// TODO: use shared memory to optimize the kernels
-// TODO: think about assignments and changed in shared memory
-// TODO: change all printf to cout
 // TODO: add timing information
-// TODO: use accumulation to sum up the points assigned to each cluster (be smart about it)
-// TODO: think about threads per block and blocks per grid
-// TODO: think about threads assignment
 // TODO: fix the makefile
 
 // Macro for checking CUDA errors
@@ -111,26 +105,31 @@ __global__ void updateCentroids(
         int c = idx / n_dims;  // Cluster index
         int d = idx % n_dims;  // Dimension index
 
-        float sum = 0.0f;
-        int count = 0;
+        // Sum up all points assigned to the cluster 'c' for dimension 'd' using sumPoints kernel
+        dim3 block_size(256);
+        dim3 num_blocks_points((n_points + block_size.x - 1) / block_size.x);
+        sumPoints<<<num_blocks_points, block_size>>>(c, d, points, assignments, centroids, n_points, n_clusters, n_dims);
 
-        // wszedzie gdzie assignments[i] !=c wpisz 0 i wszystko zsumuj
-        // TODO: Accumulate points assigned to the cluster 'c' for dimension 'd' in new kernel
-        // Sum up all points assigned to the cluster 'c' for dimension 'd'
-        for (int i = 0; i < n_points; i++) {
-            if (assignments[i] == c) {
-                sum += points[d * n_points + i];
-                count++;
-            }
-        }
+        // float sum = 0.0f;
+        // int count = 0;
 
-        // Update cluster size
-        cluster_sizes[c] = count;
+        // // wszedzie gdzie assignments[i] !=c wpisz 0 i wszystko zsumuj
+        // // TODO: Accumulate points assigned to the cluster 'c' for dimension 'd' in new kernel
+        // // Sum up all points assigned to the cluster 'c' for dimension 'd'
+        // for (int i = 0; i < n_points; i++) {
+        //     if (assignments[i] == c) {
+        //         sum += points[d * n_points + i];
+        //         count++;
+        //     }
+        // }
 
-        // Calculate the new centroid position if the cluster has points assigned
-        if (count > 0) {
-            centroids[idx] = sum / count;
-        }
+        // // Update cluster size
+        // cluster_sizes[c] = count;
+
+        // // Calculate the new centroid position if the cluster has points assigned
+        // if (count > 0) {
+        //     centroids[idx] = sum / count;
+        // }
     }
 }
 
@@ -141,9 +140,10 @@ __global__ void updateCentroids(
 // GPU2: sumowanie od razu w pierwszym kernelu za pomoca atomicAdd
 __global__ void sumPoints(
     const int cluster,         // Index of the cluster
+    const int dimension,       // Index of the dimension
     const float* points,       // Pointer to the array of points
     const int* assignments,    // Pointer to the array of assignments
-    float* cluster_sums,       // Pointer to the array of cluster sums
+    float* centroids,          // Pointer to the array of centroids
     const int n_points,        // Number of points
     const int n_clusters,      // Number of clusters
     const int n_dims           // Number of dimensions
@@ -151,19 +151,15 @@ __global__ void sumPoints(
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
     // Move points to shared memory (set to 0 if not assigned to the cluster)
-    __shared__ float shared_points[blockDim.x * n_dims];
+    __shared__ float shared_points[blockDim.x];
     __shared__ int assignments_counter = 0;
     if (idx < n_points) {
         if (assignments[idx] == cluster) {
             atomicAdd(&assignments_counter, 1);
-            for (int d = 0; d < n_dims; d++) {
-                shared_points[d * blockDim.x + threadIdx.x] = points[d * n_points + idx];
-            }
+            shared_points[threadIdx.x] = points[dimension * n_points + idx];
         }
         else {
-            for (int d = 0; d < n_dims; d++) {
-                shared_points[d * blockDim.x + threadIdx.x] = 0.0f;
-            }
+            shared_points[threadIdx.x] = 0.0f;
         }
     }
 
@@ -173,17 +169,20 @@ __global__ void sumPoints(
         return;
     }
 
-    // Sum up all the points from shared memory in parallel
-    for (int d = 0; d < n_dims; d++) {
-        for (int i = blockDim.x / 2; i > 0; i /= 2) {
-            if (threadIdx.x < i) {
-                shared_points[d * blockDim.x + threadIdx.x] += shared_points[d * blockDim.x + threadIdx.x + i];
-            }
-            __syncthreads();
+    // Sum up one dimension of all the points from shared memory in parallel
+    for (int i = blockDim.x / 2; i > 0; i /= 2) {
+        if (threadIdx.x < i) {
+            shared_points[threadIdx.x] += shared_points[threadIdx.x + i];
+            shared_points[threadIdx.x + i] = 0.0f;
         }
-        if (threadIdx.x == 0) {
-            cluster_sums[d * n_clusters + cluster] = shared_points[d * blockDim.x] / assignments_counter;
+        if (threadIdx.x == 0 && i + i < blockDim.x) {
+            shared_points[0] += shared_points[i + i];
+            shared_points[i + i] = 0.0f;
         }
+        __syncthreads();
+    }
+    if (threadIdx.x == 0) {
+        centroids[dimension * n_clusters + cluster] = shared_points[0] / assignments_counter;
     }
 }
 
