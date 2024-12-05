@@ -1,7 +1,8 @@
-#include <utils.h>
+#include "../include/utils.cuh"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
+#include <iostream>
 
 // Function to load data from a text file
 void load_text_data(
@@ -20,7 +21,7 @@ void load_text_data(
     file = fopen(path.c_str(), "r");
     if (file == NULL)
     {
-        fprintf(stderr, "Error: Unable to open the file\n");
+        std::cerr << "Error: Unable to open the file" << std::endl;
         exit(1);
     }
 
@@ -28,7 +29,7 @@ void load_text_data(
     result = fscanf(file, "%d %d %d", &N, &D, &k);
     if (result != 3)
     {
-        fprintf(stderr, "Error: Unable to read the number of points, dimension and clusters\n");
+        std::cerr << "Error: Unable to read the number of points, dimension and clusters" << std::endl;
         exit(1);
     }
 
@@ -36,7 +37,7 @@ void load_text_data(
     try {
         points = new float[N * D];
     } catch (const std::bad_alloc& e) {
-        fprintf(stderr, "Error: Unable to allocate memory for the points: %s\n", e.what());
+        std::cerr << "Error: Unable to allocate memory for the points: " << e.what() << std::endl;
         exit(1);
     }
 
@@ -67,7 +68,7 @@ void load_binary_data(
     file = fopen(path.c_str(), "rb");
     if (file == NULL)
     {
-        fprintf(stderr, "Error: Unable to open the file\n");
+        std::cerr << "Error: Unable to open the file" << std::endl;
         exit(1);
     }
 
@@ -75,19 +76,19 @@ void load_binary_data(
     result = fread(&N, sizeof(int), 1, file);
     if (result != 1)
     {
-        fprintf(stderr, "Error: Unable to read the number of points\n");
+        std::cerr << "Error: Unable to read the number of points" << std::endl;
         exit(1);
     }
     result = fread(&D, sizeof(int), 1, file);
     if (result != 1)
     {
-        fprintf(stderr, "Error: Unable to read the dimension of the points\n");
+        std::cerr << "Error: Unable to read the dimension of the points" << std::endl;
         exit(1);
     }
     result = fread(&k, sizeof(int), 1, file);
     if (result != 1)
     {
-        fprintf(stderr, "Error: Unable to read the number of clusters\n");
+        std::cerr << "Error: Unable to read the number of clusters" << std::endl;
         exit(1);
     }
 
@@ -95,7 +96,7 @@ void load_binary_data(
     try {
         points = new float[N * D];
     } catch (const std::bad_alloc& e) {
-        fprintf(stderr, "Error: Unable to allocate memory for the points: %s\n", e.what());
+        std::cerr << "Error: Unable to allocate memory for the points: " << e.what() << std::endl;
         exit(1);
     }
 
@@ -111,7 +112,7 @@ void load_binary_data(
                 break;
             }
             if (ferror(file)) {
-                fprintf(stderr, "Error reading file\n");
+                std::cerr << "Error reading file" << std::endl;
                 exit(1);
             }
         }
@@ -141,7 +142,7 @@ void save_text_results(
     file = fopen(path.c_str(), "w");
     if (file == NULL)
     {
-        fprintf(stderr, "Error: Unable to open the file\n");
+        std::cerr << "Error: Unable to open the file" << std::endl;
         exit(1);
     }
 
@@ -180,13 +181,13 @@ bool compare_results(
     file1 = fopen(path1.c_str(), "r");
     if (file1 == NULL)
     {
-        fprintf(stderr, "Error: Unable to open the first file\n");
+        std::cerr << "Error: Unable to open the first file" << std::endl;
         exit(1);
     }
     file2 = fopen(path2.c_str(), "r");
     if (file2 == NULL)
     {
-        fprintf(stderr, "Error: Unable to open the second file\n");
+        std::cerr << "Error: Unable to open the second file" << std::endl;
         exit(1);
     }
 
@@ -225,7 +226,7 @@ void read_command_line_input(
     // Check the number of arguments
     if (argc != 5)
     {
-        fprintf(stderr, "Error: \n \t Usage: KMeans data_format computation_method input_file output_file\n");
+        std::cerr << "Error: \n \t Usage: KMeans data_format computation_method input_file output_file\n";
         exit(1);
     }
 
@@ -240,7 +241,7 @@ void read_command_line_input(
     }
     else
     {
-        fprintf(stderr, "Error: Invalid data format (txt or bin)\n");
+        std::cerr << "Error: Invalid data format (txt or bin)" << std::endl;
         exit(1);
     }
 
@@ -259,7 +260,7 @@ void read_command_line_input(
     }
     else
     {
-        fprintf(stderr, "Error: Invalid computation method (cpu, gpu1 or gpu2)\n");
+        std::cerr << "Error: Invalid computation method (cpu, gpu1 or gpu2)" << std::endl;
         exit(1);
     }
 
@@ -281,7 +282,7 @@ void initialize_centroids(
     try {
         centroids = new float[k * D];
     } catch (const std::bad_alloc& e) {
-        fprintf(stderr, "Error: Unable to allocate memory for centroids: %s\n", e.what());
+        std::cerr << "Error: Unable to allocate memory for centroids: " << e.what() << std::endl;
         exit(1);
     }
  

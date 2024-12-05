@@ -71,4 +71,5 @@ results/
 data/
 output/
 logs/
+bin/
 *.log

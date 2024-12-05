@@ -2,8 +2,10 @@
 #include <stdlib.h>
 #include <chrono>
 #include <string>
-#include "utils.h"
-#include "kmeans_cpu.h"
+#include "include/utils.cuh"
+#include "include/kmeans_cpu.cuh"
+#include "include/kmeans_gpu1.cuh"
+#include <iostream>
 
 #define MAX_ITERATIONS 100
 
@@ -18,44 +20,44 @@ int main(int argc, char** argv)
     Mode mode;
 
     // 1st step: Starting program
-    printf("Starting k-means clustering program\n");
+    std::cout << "Starting k-means clustering program" << std::endl;
 
     // Read the command line input
     read_command_line_input(argv, argc, input_path, output_path, format, mode);
-    printf("Input path: %s\n", input_path);
-    printf("Output path: %s\n", output_path);
-    printf("Data format: %s\n", format == TEXT ? "TEXT" : "BINARY");
-    printf("Computation mode: %s\n", mode == CPU ? "CPU" : mode == GPU1 ? "GPU1" : "GPU2");
+    std::cout << "Input path: " << input_path << std::endl;
+    std::cout << "Output path: " << output_path << std::endl;
+    std::cout << "Data format: " << (format == TEXT ? "TEXT" : "BINARY") << std::endl;
+    std::cout << "Computation mode: " << (mode == CPU ? "CPU" : mode == GPU1 ? "GPU1" : "GPU2") << std::endl;
 
     // 2nd step: Loading data
     if (format == TEXT)
     {
-        printf("Loading text data from %s\n", input_path);
+        std::cout << "Loading text data from " << input_path << std::endl;
         auto start_time = std::chrono::high_resolution_clock::now();
 
         load_text_data(input_path, N, D, k, points);
 
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-        printf("Data loaded successfully in time: %ld ms\n", duration.count());
+        std::cout << "Data loaded successfully in time: " << duration.count() << " ms" << std::endl;
     }
     else
     {
-        printf("Loading binary data from %s\n", input_path);
+        std::cout << "Loading binary data from " << input_path << std::endl;
         auto start_time = std::chrono::high_resolution_clock::now();
 
         load_binary_data(input_path, N, D, k, points);
 
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-        printf("Data loaded successfullyin time: %ld ms\n", duration.count());
+        std::cout << "Data loaded successfully in time: " << duration.count() << " ms" << std::endl;
     }
 
     // Printing basic information about the data
-    printf("Number of points: %d\n", N);
-    printf("Number of dimensions: %d\n", D);
-    printf("Number of clusters: %d\n", k);
-    printf("Maximum number of iterations: %d\n", MAX_ITERATIONS);
+    std::cout << "Number of points: " << N << std::endl;
+    std::cout << "Number of dimensions: " << D << std::endl;
+    std::cout << "Number of clusters: " << k << std::endl;
+    std::cout << "Maximum number of iterations: " << MAX_ITERATIONS << std::endl;
 
     // Initialize the centroids
     initialize_centroids(points, centroids, N, D, k);
@@ -64,45 +66,45 @@ int main(int argc, char** argv)
     try {
         assigned_clusters = new int[N];
     } catch (const std::bad_alloc& e) {
-        fprintf(stderr, "Error: Unable to allocate memory for assigned_clusters: %s\n", e.what());
+        std::cerr << "Error: Unable to allocate memory for assigned_clusters: " << e.what() << std::endl;
         exit(1);
     }
 
     // 3rd step: Starting the k-means clustering algorithm
     if (mode == CPU)
     {
-        printf("Starting the CPU version of the k-means clustering algorithm\n");
+        std::cout << "Starting the CPU version of the k-means clustering algorithm" << std::endl;
 
         kmeans_cpu(points, centroids, assigned_clusters, N, D, k, MAX_ITERATIONS);
 
-        printf("K-means clustering completed\n");
+        std::cout << "K-means clustering completed" << std::endl;
     }
     else if (mode == GPU1)
     {
-        printf("Starting the GPU1 version of the k-means clustering algorithm\n");
+        std::cout << "Starting the GPU1 version of the k-means clustering algorithm" << std::endl;
 
-        // kmeans_gpu1(points, centroids, assigned_clusters, N, D, k, MAX_ITERATIONS);
+        kmeans_gpu1(points, centroids, assigned_clusters, N, D, k, MAX_ITERATIONS);
 
-        printf("K-means clustering completed\n");
+        std::cout << "K-means clustering completed" << std::endl;
     }
     else
     {
-        printf("Starting the GPU2 version of the k-means clustering algorithm\n");
+        std::cout << "Starting the GPU2 version of the k-means clustering algorithm" << std::endl;
 
         // kmeans_gpu2(points, centroids, assigned_clusters, N, D, k, MAX_ITERATIONS);
 
-        printf("K-means clustering completed\n");
+        std::cout << "K-means clustering completed" << std::endl;
     }
 
     // 4th step: Saving the results
-    printf("Starting saving the results to %s\n", output_path);
+    std::cout << "Starting saving the results to " << output_path << std::endl;
     auto start = std::chrono::high_resolution_clock::now();
 
     save_text_results(output_path, N, D, k, assigned_clusters, centroids);
 
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    printf("Results saved successfully in time: %ld ms\n", duration.count());
+    std::cout << "Results saved successfully in time: " << duration.count() << " ms" << std::endl;
 
     // Free the memory
     delete[] points;

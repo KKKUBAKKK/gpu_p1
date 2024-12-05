@@ -1,6 +1,8 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include <string>
+
 /** @brief Loads data from a text file
  *  @param path Path to the input file
  *  @param N Number of points (output parameter)

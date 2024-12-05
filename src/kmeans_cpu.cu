@@ -1,7 +1,9 @@
-#include <kmeans_cpu.h>
+#include "../include/kmeans_cpu.cuh"
 #include <stdio.h>
 #include <stdlib.h>
 #include <chrono>
+#include <new>
+#include <iostream>
 
 void kmeans_cpu(
     const float* points,          // Input points array [N x D]
@@ -18,7 +20,7 @@ void kmeans_cpu(
     try {
         cluster_sizes = new int[k];
     } catch (const std::bad_alloc& e) {
-        fprintf(stderr, "Error: Unable to allocate memory for cluster_sizes: %s\n", e.what());
+        std::cerr << "Error: Unable to allocate memory for cluster_sizes: " << e.what() << std::endl;
         exit(1);
     }
 
@@ -26,7 +28,7 @@ void kmeans_cpu(
     try {
         new_centroids = new float[k * D];
     } catch (const std::bad_alloc& e) {
-        fprintf(stderr, "Error: Unable to allocate memory for new_centroids: %s\n", e.what());
+        std::cerr << "Error: Unable to allocate memory for new_centroids: " << e.what() << std::endl;
         exit(1);
     }
     
@@ -56,7 +58,7 @@ void kmeans_cpu(
         // Stop timer
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-        printf("Iteration %d completed, %d points changed in time: %ld ms\n", iter, changed, duration.count());
+        std::cout << "Iteration " << iter << " completed, " << changed << " points changed in time: " << duration.count() << " ms" << std::endl;
         
         iter++;
     }
