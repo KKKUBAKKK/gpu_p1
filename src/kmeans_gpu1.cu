@@ -109,35 +109,10 @@ __global__ void updateCentroids(
         dim3 block_size(256);
         dim3 num_blocks_points((n_points + block_size.x - 1) / block_size.x);
         sumPoints<<<num_blocks_points, block_size>>>(c, d, points, assignments, centroids, n_points, n_clusters, n_dims);
-
-        // float sum = 0.0f;
-        // int count = 0;
-
-        // // wszedzie gdzie assignments[i] !=c wpisz 0 i wszystko zsumuj
-        // // TODO: Accumulate points assigned to the cluster 'c' for dimension 'd' in new kernel
-        // // Sum up all points assigned to the cluster 'c' for dimension 'd'
-        // for (int i = 0; i < n_points; i++) {
-        //     if (assignments[i] == c) {
-        //         sum += points[d * n_points + i];
-        //         count++;
-        //     }
-        // }
-
-        // // Update cluster size
-        // cluster_sizes[c] = count;
-
-        // // Calculate the new centroid position if the cluster has points assigned
-        // if (count > 0) {
-        //     centroids[idx] = sum / count;
-        // }
     }
 }
 
 // CUDA kernel to sum up one dimension of the points for one cluster
-// nie wiem czy odpalac sumowanie dla kazdego wymiaru osobno albo klastra
-// raczej zrob tak: kernel z jednym watkiem dla kazdego klastra odpala kernel z watkami dla kazdego punktu zeby zsumowac
-// ewentualnie watek dla kazdego wymiaru i klastra , ale raczej nie
-// GPU2: sumowanie od razu w pierwszym kernelu za pomoca atomicAdd
 __global__ void sumPoints(
     const int cluster,         // Index of the cluster
     const int dimension,       // Index of the dimension
@@ -196,6 +171,14 @@ void kmeans_gpu1(
     const int max_iter        // Maximum number of iterations
 )
 {
+    // Create CUDA events for timing
+    cudaEvent_t start_it, stop_it, start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    cudaEventCreate(&start_it);
+    cudaEventCreate(&stop_it);
+    float milliseconds = 0.0f;
+
     // Allocate device memory
     GPUResources res;
     
@@ -205,49 +188,106 @@ void kmeans_gpu1(
     CUDA_CHECK(cudaMalloc(&res.d_cluster_sizes, k * sizeof(int)), res);
     
     // Copy data to device
+    cudaEvent_t start_copy, stop_copy;
+    cudaEventCreate(&start_copy);
+    cudaEventCreate(&stop_copy);
+    cudaEventRecord(start_copy);
+
     CUDA_CHECK(cudaMemcpy(res.d_points, h_points, N * d * sizeof(float), cudaMemcpyHostToDevice), res);
     CUDA_CHECK(cudaMemcpy(res.d_centroids, h_centroids, k * d * sizeof(float), cudaMemcpyHostToDevice), res);
     
+    cudaEventRecord(stop_copy);
+    cudaEventSynchronize(stop_copy);
+    cudaEventElapsedTime(&milliseconds, start_copy, stop_copy);
+    std::cout << "Data copying to device: " << milliseconds << " ms" << std::endl;
+
     // Configure kernel launch parameters
     dim3 block_size(256);
     dim3 num_blocks_points((N + block_size.x - 1) / block_size.x);
     dim3 num_blocks_centroids((k * d + block_size.x - 1) / block_size.x);
+
+    // Create events for timing
+    cudaEvent_t start_kernel1, stop_kernel1, start_kernel2, stop_kernel2;
+    cudaEventCreate(&start_kernel1);
+    cudaEventCreate(&stop_kernel1);
+    cudaEventCreate(&start_kernel2);
+    cudaEventCreate(&stop_kernel2);
     
     // Main loop
+    cudaEventRecord(start);
     int changed = 0;
     for (int iter = 0; iter < max_iter; iter++) {
+        cudaEventRecord(start_it);
+
         // Find nearest centroids
+        cudaEventRecord(start_kernel1);
         findNearestCentroids<<<num_blocks_points, block_size>>>(
             res.d_points, res.d_centroids, res.d_assignments, N, k, d, &changed);
+        cudaEventRecord(stop_kernel1);
         
         // Check for kernel launch errors
         CUDA_CHECK(cudaGetLastError(), res);
         
         // Wait for kernel to finish and check for errors
         CUDA_CHECK(cudaDeviceSynchronize(), res);
+
+        // Display kernel timing information
+        cudaEventSynchronize(stop_kernel1);
+        cudaEventElapsedTime(&milliseconds, start_kernel1, stop_kernel1);
+        std::cout << "Assigning nearest centroids execution time: " << milliseconds << " ms" << std::endl;
 
         // Check if any assignments changed
         if (changed == 0) {
             std::cout << "No changes in assignments, stopping the algorithm" << std::endl;
             break;
         }
-        changed = 0;
         
         // Update centroids
+        cudaEventRecord(start_kernel2);
         updateCentroids<<<num_blocks_centroids, block_size>>>(
             res.d_points, res.d_centroids, res.d_assignments, res.d_cluster_sizes,
             N, k, d);
+        cudaEventRecord(stop_kernel2);
 
         // Check for kernel launch errors
         CUDA_CHECK(cudaGetLastError(), res);
         
         // Wait for kernel to finish and check for errors
         CUDA_CHECK(cudaDeviceSynchronize(), res);
+
+        // Display kernel timing information
+        cudaEventSynchronize(stop_kernel2);
+        cudaEventElapsedTime(&milliseconds, start_kernel2, stop_kernel2);
+        std::cout << "Updating centroids execution time: " << milliseconds << " ms" << std::endl;
+    
+        // Display general info about iteration
+        cudaEventRecord(stop_it);
+        cudaEventSynchronize(stop_it);
+        cudaEventElapsedTime(&milliseconds, start_it, stop_it);
+        std::cout << "Iteration " << iter << " completed in " << milliseconds << " ms" << std::endl;
+        std::cout << "Points that changed cluster: " << changed << std::endl;
+
+        changed = 0;
     }
+
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    std::cout << "Total execution time of the main loop: " << milliseconds << " ms" << std::endl;
     
     // Copy results back to host
+    cudaEvent_t start_copy_back, stop_copy_back;
+    cudaEventCreate(&start_copy_back);
+    cudaEventCreate(&stop_copy_back);
+    cudaEventRecord(start_copy_back);
+
     CUDA_CHECK(cudaMemcpy(h_centroids, res.d_centroids, k * d * sizeof(float), cudaMemcpyDeviceToHost), res);
     CUDA_CHECK(cudaMemcpy(h_assignments, res.d_assignments, N * sizeof(int), cudaMemcpyDeviceToHost), res);
+
+    cudaEventRecord(stop_copy_back);
+    cudaEventSynchronize(stop_copy_back);
+    cudaEventElapsedTime(&milliseconds, start_copy_back, stop_copy_back);
+    std::cout << "Data copying back to host: " << milliseconds << " ms" << std::endl;
     
     // Cleanup
     CUDA_CHECK(cudaFree(res.d_points), res);

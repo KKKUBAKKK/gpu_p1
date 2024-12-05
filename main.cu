@@ -5,6 +5,7 @@
 #include "include/utils.cuh"
 #include "include/kmeans_cpu.cuh"
 #include "include/kmeans_gpu1.cuh"
+#include "include/kmeans_gpu2.cuh"
 #include <iostream>
 
 #define MAX_ITERATIONS 100
@@ -91,7 +92,7 @@ int main(int argc, char** argv)
     {
         std::cout << "Starting the GPU2 version of the k-means clustering algorithm" << std::endl;
 
-        // kmeans_gpu2(points, centroids, assigned_clusters, N, D, k, MAX_ITERATIONS);
+        kmeans_gpu2(points, centroids, assigned_clusters, N, D, k, MAX_ITERATIONS);
 
         std::cout << "K-means clustering completed" << std::endl;
     }
