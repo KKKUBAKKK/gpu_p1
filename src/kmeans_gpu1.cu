@@ -5,8 +5,7 @@
 #include "../include/kmeans_gpu1.cuh"
 #include <iostream>
 
-// TODO: add timing information
-// TODO: fix the makefile
+#define BLOCK_SIZE 256
 
 // Macro for checking CUDA errors
 #define CUDA_CHECK(call, res) \
@@ -21,11 +20,13 @@
     } while(0)
 
 // Cleanup function
-static void cleanup_gpu_resources(GPUResources& res) {
+void cleanup_gpu_resources(GPUResources& res) {
     if (res.d_points) cudaFree(res.d_points);
     if (res.d_centroids) cudaFree(res.d_centroids);
     if (res.d_assignments) cudaFree(res.d_assignments);
     if (res.d_cluster_sizes) cudaFree(res.d_cluster_sizes);
+    if (res.d_cluster_sums) cudaFree(res.d_cluster_sums);
+    if (res.d_changed) cudaFree(res.d_changed);
     res = GPUResources(); // Reset to nullptr
 }
 
@@ -44,8 +45,10 @@ __global__ void findNearestCentroids(
     int points_in_block = blockDim.x;
 
     // Put centroids and points in shared memory
-    __shared__ float shared_centroids[n_clusters * n_dims];
-    __shared__ float shared_points[points_in_block * n_dims];
+    extern __shared__ float shmem[];
+
+    float* shared_centroids = shmem;
+    float* shared_points = &shmem[n_clusters * n_dims];
 
     // Threads in every block with idx.x < n_clusters will each put one cluster into shared memory
     if (threadIdx.x < n_clusters) {
@@ -89,29 +92,6 @@ __global__ void findNearestCentroids(
     }
 }
 
-// CUDA kernel for updating centroids
-__global__ void updateCentroids(
-    const float* points,       // Pointer to the array of points
-    float* centroids,          // Pointer to the array of centroids
-    const int* assignments,    // Pointer to the array of assignments
-    int* cluster_sizes,        // Pointer to the array of cluster sizes
-    const int n_points,        // Number of points
-    const int n_clusters,      // Number of clusters
-    const int n_dims           // Number of dimensions
-) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if (idx < n_clusters * n_dims) {
-        int c = idx / n_dims;  // Cluster index
-        int d = idx % n_dims;  // Dimension index
-
-        // Sum up all points assigned to the cluster 'c' for dimension 'd' using sumPoints kernel
-        dim3 block_size(256);
-        dim3 num_blocks_points((n_points + block_size.x - 1) / block_size.x);
-        sumPoints<<<num_blocks_points, block_size>>>(c, d, points, assignments, centroids, n_points, n_clusters, n_dims);
-    }
-}
-
 // CUDA kernel to sum up one dimension of the points for one cluster
 __global__ void sumPoints(
     const int cluster,         // Index of the cluster
@@ -126,8 +106,11 @@ __global__ void sumPoints(
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
     // Move points to shared memory (set to 0 if not assigned to the cluster)
-    __shared__ float shared_points[blockDim.x];
-    __shared__ int assignments_counter = 0;
+    __shared__ float shared_points[BLOCK_SIZE];
+    __shared__ int assignments_counter;
+    if (threadIdx.x == 0) {
+        assignments_counter = 0;
+    }
     if (idx < n_points) {
         if (assignments[idx] == cluster) {
             atomicAdd(&assignments_counter, 1);
@@ -157,7 +140,34 @@ __global__ void sumPoints(
         __syncthreads();
     }
     if (threadIdx.x == 0) {
-        centroids[dimension * n_clusters + cluster] = shared_points[0] / assignments_counter;
+        atomicAdd(&centroids[dimension * n_clusters + cluster], shared_points[0] / assignments_counter);
+    }
+}
+
+// CUDA kernel for updating centroids
+__global__ void updateCentroids(
+    const float* points,       // Pointer to the array of points
+    float* centroids,          // Pointer to the array of centroids
+    const int* assignments,    // Pointer to the array of assignments
+    const int n_points,        // Number of points
+    const int n_clusters,      // Number of clusters
+    const int n_dims           // Number of dimensions
+) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (idx < n_clusters * n_dims) {
+        int c = idx / n_dims;  // Cluster index
+        int d = idx % n_dims;  // Dimension index
+
+        // Sum up all points assigned to the cluster 'c' for dimension 'd' using sumPoints kernel
+        dim3 block_size(256);
+        dim3 num_blocks_points((n_points + block_size.x - 1) / block_size.x);
+        float temp = centroids[d * n_clusters + c];
+        centroids[d * n_clusters + c] = 0.0f;
+        sumPoints<<<num_blocks_points, block_size>>>(c, d, points, assignments, centroids, n_points, n_clusters, n_dims);
+        if (centroids[d * n_clusters + c] == 0.0f) {
+            centroids[d * n_clusters + c] = temp;
+        }
     }
 }
 
@@ -178,6 +188,7 @@ void kmeans_gpu1(
     cudaEventCreate(&start_it);
     cudaEventCreate(&stop_it);
     float milliseconds = 0.0f;
+    int changed = 0;
 
     // Allocate device memory
     GPUResources res;
@@ -185,7 +196,7 @@ void kmeans_gpu1(
     CUDA_CHECK(cudaMalloc(&res.d_points, N * d * sizeof(float)), res);
     CUDA_CHECK(cudaMalloc(&res.d_centroids, k * d * sizeof(float)), res);
     CUDA_CHECK(cudaMalloc(&res.d_assignments, N * sizeof(int)), res);
-    CUDA_CHECK(cudaMalloc(&res.d_cluster_sizes, k * sizeof(int)), res);
+    CUDA_CHECK(cudaMalloc(&res.d_changed, sizeof(int)), res);
     
     // Copy data to device
     cudaEvent_t start_copy, stop_copy;
@@ -195,6 +206,7 @@ void kmeans_gpu1(
 
     CUDA_CHECK(cudaMemcpy(res.d_points, h_points, N * d * sizeof(float), cudaMemcpyHostToDevice), res);
     CUDA_CHECK(cudaMemcpy(res.d_centroids, h_centroids, k * d * sizeof(float), cudaMemcpyHostToDevice), res);
+    CUDA_CHECK(cudaMemcpy(res.d_changed, &changed, sizeof(int), cudaMemcpyHostToDevice), res);
     
     cudaEventRecord(stop_copy);
     cudaEventSynchronize(stop_copy);
@@ -202,9 +214,12 @@ void kmeans_gpu1(
     std::cout << "Data copying to device: " << milliseconds << " ms" << std::endl;
 
     // Configure kernel launch parameters
-    dim3 block_size(256);
+    dim3 block_size(BLOCK_SIZE);
     dim3 num_blocks_points((N + block_size.x - 1) / block_size.x);
     dim3 num_blocks_centroids((k * d + block_size.x - 1) / block_size.x);
+
+    // Calculate shared memory size
+    size_t shared_mem_size = (N * d + BLOCK_SIZE * d) * sizeof(float);
 
     // Create events for timing
     cudaEvent_t start_kernel1, stop_kernel1, start_kernel2, stop_kernel2;
@@ -215,14 +230,13 @@ void kmeans_gpu1(
     
     // Main loop
     cudaEventRecord(start);
-    int changed = 0;
     for (int iter = 0; iter < max_iter; iter++) {
         cudaEventRecord(start_it);
 
         // Find nearest centroids
         cudaEventRecord(start_kernel1);
-        findNearestCentroids<<<num_blocks_points, block_size>>>(
-            res.d_points, res.d_centroids, res.d_assignments, N, k, d, &changed);
+        findNearestCentroids<<<num_blocks_points, block_size, shared_mem_size>>>(
+            res.d_points, res.d_centroids, res.d_assignments, N, k, d, res.d_changed);
         cudaEventRecord(stop_kernel1);
         
         // Check for kernel launch errors
@@ -236,6 +250,9 @@ void kmeans_gpu1(
         cudaEventElapsedTime(&milliseconds, start_kernel1, stop_kernel1);
         std::cout << "Assigning nearest centroids execution time: " << milliseconds << " ms" << std::endl;
 
+        // Copy the number of changed assignments back to host
+        CUDA_CHECK(cudaMemcpy(&changed, res.d_changed, sizeof(int), cudaMemcpyDeviceToHost), res);
+
         // Check if any assignments changed
         if (changed == 0) {
             std::cout << "No changes in assignments, stopping the algorithm" << std::endl;
@@ -245,7 +262,7 @@ void kmeans_gpu1(
         // Update centroids
         cudaEventRecord(start_kernel2);
         updateCentroids<<<num_blocks_centroids, block_size>>>(
-            res.d_points, res.d_centroids, res.d_assignments, res.d_cluster_sizes,
+            res.d_points, res.d_centroids, res.d_assignments,
             N, k, d);
         cudaEventRecord(stop_kernel2);
 
@@ -267,7 +284,9 @@ void kmeans_gpu1(
         std::cout << "Iteration " << iter << " completed in " << milliseconds << " ms" << std::endl;
         std::cout << "Points that changed cluster: " << changed << std::endl;
 
+        // Setting changed back to 0
         changed = 0;
+        CUDA_CHECK(cudaMemcpy(res.d_changed, &changed, sizeof(int), cudaMemcpyHostToDevice), res);
     }
 
     cudaEventRecord(stop);
@@ -290,8 +309,8 @@ void kmeans_gpu1(
     std::cout << "Data copying back to host: " << milliseconds << " ms" << std::endl;
     
     // Cleanup
+    CUDA_CHECK(cudaFree(res.d_changed), res);
     CUDA_CHECK(cudaFree(res.d_points), res);
     CUDA_CHECK(cudaFree(res.d_centroids), res);
     CUDA_CHECK(cudaFree(res.d_assignments), res);
-    CUDA_CHECK(cudaFree(res.d_cluster_sizes), res);
 }

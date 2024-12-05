@@ -1,15 +1,20 @@
 #ifndef KMEANS_GPU1_H
 #define KMEANS_GPU1_H
 
-// Structure to hold all the GPU resources
+/**
+ * @brief Structure to hold GPU memory resources
+ */
 struct GPUResources {
     float *d_points;
     float *d_centroids;
     int *d_assignments;
     int *d_cluster_sizes;
+    float *d_cluster_sums;
+    int *d_changed;
 
     GPUResources() : d_points(nullptr), d_centroids(nullptr), 
-                     d_assignments(nullptr), d_cluster_sizes(nullptr) {}
+                     d_assignments(nullptr), d_cluster_sizes(nullptr),
+                     d_cluster_sums(nullptr), d_changed(nullptr) {}
 };
 
 /**
@@ -25,5 +30,11 @@ struct GPUResources {
  */
 void kmeans_gpu1(const float* h_points, float* h_centroids, int* h_assignments, 
                 const int N, const int d, const int k, const int max_iter);
+
+/**
+ * @brief Cleanup function to free GPU resources
+ * @param res Reference to GPUResources structure containing allocated memory
+ */
+void cleanup_gpu_resources(GPUResources& res);
 
 #endif // KMEANS_GPU1_H
