@@ -2,11 +2,11 @@
 #include <stdlib.h>
 #include <chrono>
 #include <string>
+#include <iostream>
 #include "include/utils.cuh"
 #include "include/kmeans_cpu.cuh"
 #include "include/kmeans_gpu1.cuh"
 #include "include/kmeans_gpu2.cuh"
-#include <iostream>
 
 #define MAX_ITERATIONS 100
 
