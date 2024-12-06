@@ -76,25 +76,37 @@ int main(int argc, char** argv)
     {
         std::cout << "Starting the CPU version of the k-means clustering algorithm" << std::endl;
 
-        kmeans_cpu(points, centroids, assigned_clusters, N, D, k, MAX_ITERATIONS);
+        auto start_time = std::chrono::high_resolution_clock::now();
 
-        std::cout << "K-means clustering completed" << std::endl;
+        kmeans_cpu2(points, centroids, assigned_clusters, N, D, k, MAX_ITERATIONS);
+
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+        std::cout << "K-means clustering completed in time: " << duration.count() << " ms" << std::endl;
     }
     else if (mode == GPU1)
     {
         std::cout << "Starting the GPU1 version of the k-means clustering algorithm" << std::endl;
 
+        auto start_time = std::chrono::high_resolution_clock::now();
+
         kmeans_gpu1(points, centroids, assigned_clusters, N, D, k, MAX_ITERATIONS);
 
-        std::cout << "K-means clustering completed" << std::endl;
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+        std::cout << "K-means clustering completed in time: " << duration.count() << " ms" << std::endl;
     }
     else
     {
         std::cout << "Starting the GPU2 version of the k-means clustering algorithm" << std::endl;
 
+        auto start_time = std::chrono::high_resolution_clock::now();
+
         kmeans_gpu2(points, centroids, assigned_clusters, N, D, k, MAX_ITERATIONS);
 
-        std::cout << "K-means clustering completed" << std::endl;
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+        std::cout << "K-means clustering completed in time: " << duration.count() << " ms" << std::endl;
     }
 
     // 4th step: Saving the results

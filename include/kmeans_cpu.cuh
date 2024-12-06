@@ -1,6 +1,16 @@
 #ifndef KMEANS_CPU_H
 #define KMEANS_CPU_H
 
+void kmeans_cpu2(
+    const float* points,          // Input points array [N x D]
+    float* centroids,             // Centroids array [k x D]
+    int* assigned_clusters,       // Cluster assignments [N]
+    const int N,                  // Number of points
+    const int D,                  // Dimensions
+    const int k,                  // Number of clusters
+    const int max_iter            // Maximum iterations
+    );
+
 /**
  * @brief Performs k-means clustering algorithm on CPU
  * @param points Input points array [N x D]

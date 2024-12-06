@@ -46,7 +46,10 @@ void load_text_data(
     {
         for (int j = 0; j < D; j++)
         {
-            fscanf(file, "%f", &points[j * N + i]);
+            if (fscanf(file, "%f", &points[j * N + i]) != 1) {
+                std::cerr << "Error: Unable to read point data" << std::endl;
+                exit(1);
+            }
         }
     }
 }
@@ -106,7 +109,7 @@ void load_binary_data(
     int point = 0;
     while ((elements_read = fread(temp, sizeof(float), D, file)) > 0) 
     {
-        if (elements_read != D) {
+        if (elements_read != (size_t)D) {
             if (feof(file)) {
                 // Normal EOF reached
                 break;
@@ -273,9 +276,9 @@ void read_command_line_input(
 void initialize_centroids(
     const float* points,          // Input points
     float*& centroids,             // Output centroids
-    const int N,                  // Number of points
-    const int D,                  // Dimension of the points
-    const int k                   // Number of clusters
+    int N,                  // Number of points
+    int D,                  // Dimension of the points
+    int k                   // Number of clusters
     )
 {
     // Allocate memory for the cluster sizes

@@ -26,6 +26,7 @@ build/
 debug/
 release/
 bin/
+results/
 obj/
 
 # Dependency directories
@@ -51,6 +52,7 @@ external/
 
 # Compiled data files
 *.bin
+KMeans
 
 # Debug files
 *.dSYM/
@@ -70,6 +72,7 @@ external/
 results/
 data/
 output/
+results/
 logs/
 bin/
 *.log

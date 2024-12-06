@@ -75,6 +75,6 @@ void read_command_line_input(char** argv, const int& argc, std::string& input_pa
  *  @param D Dimension of each point
  *  @param k Number of clusters/centroids to select
  */
-void initialize_centroids(const float* points, float* centroids, const int N, const int D, const int k);
+void initialize_centroids(const float* points, float*& centroids, int N, int D, int k);
 
 #endif // UTILS_H
