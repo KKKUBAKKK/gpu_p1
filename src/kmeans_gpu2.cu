@@ -7,9 +7,6 @@
 
 #define BLOCK_SIZE 256
 
-// TODO: add timing information
-// TODO: fix the makefile
-
 // Macro for checking CUDA errors
 #define CUDA_CHECK(call, res) \
     do { \

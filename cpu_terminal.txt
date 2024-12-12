@@ -4,52 +4,52 @@ Output path: ./results/cpu_test.txt
 Data format: BINARY
 Computation mode: CPU
 Loading binary data from ./data/points_5mln_4d_5c.dat
-Data loaded successfully in time: 262 ms
+Data loaded successfully in time: 261 ms
 Number of points: 5000000
 Number of dimensions: 4
 Number of clusters: 5
 Maximum number of iterations: 100
 Starting the CPU version of the k-means clustering algorithm
-Iteration 0 completed, 4444678 points changed in time: 265 ms
-Iteration 1 completed, 755296 points changed in time: 249 ms
-Iteration 2 completed, 105082 points changed in time: 240 ms
-Iteration 3 completed, 50731 points changed in time: 239 ms
-Iteration 4 completed, 29701 points changed in time: 239 ms
-Iteration 5 completed, 19885 points changed in time: 239 ms
-Iteration 6 completed, 14002 points changed in time: 239 ms
-Iteration 7 completed, 10421 points changed in time: 212 ms
-Iteration 8 completed, 7934 points changed in time: 206 ms
-Iteration 9 completed, 6012 points changed in time: 206 ms
-Iteration 10 completed, 4571 points changed in time: 206 ms
-Iteration 11 completed, 3462 points changed in time: 207 ms
-Iteration 12 completed, 2635 points changed in time: 206 ms
-Iteration 13 completed, 2008 points changed in time: 206 ms
-Iteration 14 completed, 1531 points changed in time: 206 ms
-Iteration 15 completed, 1224 points changed in time: 206 ms
-Iteration 16 completed, 929 points changed in time: 207 ms
-Iteration 17 completed, 723 points changed in time: 206 ms
-Iteration 18 completed, 549 points changed in time: 206 ms
-Iteration 19 completed, 425 points changed in time: 206 ms
-Iteration 20 completed, 343 points changed in time: 206 ms
-Iteration 21 completed, 248 points changed in time: 207 ms
-Iteration 22 completed, 223 points changed in time: 206 ms
-Iteration 23 completed, 167 points changed in time: 206 ms
-Iteration 24 completed, 158 points changed in time: 206 ms
-Iteration 25 completed, 121 points changed in time: 206 ms
-Iteration 26 completed, 77 points changed in time: 207 ms
-Iteration 27 completed, 49 points changed in time: 206 ms
-Iteration 28 completed, 27 points changed in time: 206 ms
-Iteration 29 completed, 16 points changed in time: 206 ms
-Iteration 30 completed, 17 points changed in time: 206 ms
-Iteration 31 completed, 17 points changed in time: 207 ms
-Iteration 32 completed, 21 points changed in time: 206 ms
-Iteration 33 completed, 16 points changed in time: 206 ms
-Iteration 34 completed, 7 points changed in time: 206 ms
-Iteration 35 completed, 6 points changed in time: 206 ms
-Iteration 36 completed, 3 points changed in time: 207 ms
-Iteration 37 completed, 2 points changed in time: 206 ms
-Iteration 38 completed, 2 points changed in time: 206 ms
-Iteration 39 completed, 0 points changed in time: 206 ms
-K-means clustering completed in time: 8544 ms
+Iteration 0 completed, 4444678 points changed in time: 259 ms
+Iteration 1 completed, 755296 points changed in time: 244 ms
+Iteration 2 completed, 105082 points changed in time: 234 ms
+Iteration 3 completed, 50731 points changed in time: 233 ms
+Iteration 4 completed, 29701 points changed in time: 233 ms
+Iteration 5 completed, 19885 points changed in time: 233 ms
+Iteration 6 completed, 14002 points changed in time: 232 ms
+Iteration 7 completed, 10421 points changed in time: 211 ms
+Iteration 8 completed, 7934 points changed in time: 201 ms
+Iteration 9 completed, 6012 points changed in time: 201 ms
+Iteration 10 completed, 4571 points changed in time: 201 ms
+Iteration 11 completed, 3462 points changed in time: 201 ms
+Iteration 12 completed, 2635 points changed in time: 202 ms
+Iteration 13 completed, 2008 points changed in time: 201 ms
+Iteration 14 completed, 1531 points changed in time: 201 ms
+Iteration 15 completed, 1224 points changed in time: 201 ms
+Iteration 16 completed, 929 points changed in time: 201 ms
+Iteration 17 completed, 723 points changed in time: 202 ms
+Iteration 18 completed, 549 points changed in time: 201 ms
+Iteration 19 completed, 425 points changed in time: 201 ms
+Iteration 20 completed, 343 points changed in time: 201 ms
+Iteration 21 completed, 248 points changed in time: 201 ms
+Iteration 22 completed, 223 points changed in time: 202 ms
+Iteration 23 completed, 167 points changed in time: 201 ms
+Iteration 24 completed, 158 points changed in time: 201 ms
+Iteration 25 completed, 121 points changed in time: 201 ms
+Iteration 26 completed, 77 points changed in time: 201 ms
+Iteration 27 completed, 49 points changed in time: 202 ms
+Iteration 28 completed, 27 points changed in time: 201 ms
+Iteration 29 completed, 16 points changed in time: 201 ms
+Iteration 30 completed, 17 points changed in time: 201 ms
+Iteration 31 completed, 17 points changed in time: 201 ms
+Iteration 32 completed, 21 points changed in time: 202 ms
+Iteration 33 completed, 16 points changed in time: 201 ms
+Iteration 34 completed, 7 points changed in time: 201 ms
+Iteration 35 completed, 6 points changed in time: 201 ms
+Iteration 36 completed, 3 points changed in time: 201 ms
+Iteration 37 completed, 2 points changed in time: 202 ms
+Iteration 38 completed, 2 points changed in time: 201 ms
+Iteration 39 completed, 0 points changed in time: 201 ms
+K-means clustering completed in time: 8337 ms
 Starting saving the results to ./results/cpu_test.txt
-Results saved successfully in time: 702 ms
+Results saved successfully in time: 658 ms
