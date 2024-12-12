@@ -79,10 +79,10 @@ __global__ void kmeans_iteration(
         // Iterate over each centroid
         for (int c = 0; c < k; c++) {
             float dist = 0.0f;
-
+            
             // Calculate the squared Euclidean distance
-            for (int d = 0; d < d; d++) {
-                float diff = shared_points[d * points_in_block + sidx] - shared_centroids[d * k + c];
+            for (int dim = 0; dim < d; dim++) {
+                float diff = shared_points[dim * points_in_block + sidx] - shared_centroids[dim * k + c];
                 dist += diff * diff;
             }
 
@@ -94,9 +94,11 @@ __global__ void kmeans_iteration(
         }
 
         // Assign the point to the nearest centroid
-        if (assignments[idx] != nearest_centroid)
+        if (assignments[idx] != nearest_centroid) {
             atomicAdd(changed, 1);
-        assignments[idx] = nearest_centroid;
+            assignments[idx] = nearest_centroid;
+        }
+        // printf("Point %d assigned to cluster %d\n", idx, nearest_centroid);
         atomicAdd(&shared_counts[nearest_centroid], 1);
 
         // Update the sum
@@ -222,13 +224,14 @@ void kmeans_gpu2(
         kmeans_iteration<<<num_blocks_points, block_size, shared_mem_size>>>(
             res.d_points, res.d_centroids, res.d_assignments, res.d_cluster_sizes,
             res.d_cluster_sums, N, d, k, res.d_changed);
-        cudaEventRecord(stop_kernel1);
         
         // Check for kernel launch errors
         CUDA_CHECK(cudaGetLastError(), res);
         
         // Wait for kernel to finish and check for errors
         CUDA_CHECK(cudaDeviceSynchronize(), res);
+
+        cudaEventRecord(stop_kernel1);
 
         // Display kernel timing information
         cudaEventSynchronize(stop_kernel1);

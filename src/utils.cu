@@ -154,7 +154,7 @@ void save_text_results(
     {
         for (int j = 0; j < D; j++)
         {
-            fprintf(file, "%10f", centroids[j * k + i]);
+            fprintf(file, "%10.4f", centroids[j * k + i]);
         }
         fprintf(file, "\n");
     }

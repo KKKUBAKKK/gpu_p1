@@ -7,13 +7,15 @@
 struct GPUResources {
     float *d_points;
     float *d_centroids;
+    float *d_new_centroids;
     int *d_assignments;
+    int *d_assignments_counter;
     int *d_cluster_sizes;
     float *d_cluster_sums;
     int *d_changed;
 
-    GPUResources() : d_points(nullptr), d_centroids(nullptr), 
-                     d_assignments(nullptr), d_cluster_sizes(nullptr),
+    GPUResources() : d_points(nullptr), d_centroids(nullptr), d_new_centroids(nullptr),
+                     d_assignments(nullptr), d_assignments_counter(nullptr), d_cluster_sizes(nullptr),
                      d_cluster_sums(nullptr), d_changed(nullptr) {}
 };
 
