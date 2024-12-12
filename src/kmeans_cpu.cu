@@ -74,7 +74,7 @@ void kmeans_cpu2(
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
         std::cout << "Iteration " << iter << " completed, " << changed << " points changed in time: " << duration.count() << " ms" << std::endl;
-        
+
         iter++;
     }
 }

@@ -22,15 +22,6 @@
         } \
     } while(0)
 
-// // Cleanup function
-// static void cleanup_gpu_resources(GPUResources& res) {
-//     if (res.d_points) cudaFree(res.d_points);
-//     if (res.d_centroids) cudaFree(res.d_centroids);
-//     if (res.d_assignments) cudaFree(res.d_assignments);
-//     if (res.d_cluster_sizes) cudaFree(res.d_cluster_sizes);
-//     res = GPUResources(); // Reset to nullptr
-// }
-
 // Kernel to find nearest centroids and update assignments
 __global__ void kmeans_iteration(
     const float* points,        // Array of points [N x d]
@@ -41,7 +32,8 @@ __global__ void kmeans_iteration(
     const int N,                // Number of points
     const int d,                // Number of dimensions
     const int k,                // Number of clusters
-    int* changed                // Flag to indicate if any assignments changed
+    int* changed,               // Flag to indicate if any assignments changed
+    int num_blocks              // Number of blocks
 )
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -98,7 +90,6 @@ __global__ void kmeans_iteration(
             atomicAdd(changed, 1);
             assignments[idx] = nearest_centroid;
         }
-        // printf("Point %d assigned to cluster %d\n", idx, nearest_centroid);
         atomicAdd(&shared_counts[nearest_centroid], 1);
 
         // Update the sum
@@ -109,13 +100,12 @@ __global__ void kmeans_iteration(
 
     __syncthreads();
 
-    // TODO: think if the indexing is correct
     // Store the results back to global memory
     if (threadIdx.x < k) {
         int block_offset = blockIdx.x * k;
         atomicAdd(&cluster_sizes[block_offset + threadIdx.x], shared_counts[threadIdx.x]);
         for (int i = 0; i < d; i++) {
-            atomicAdd(&cluster_sums[i * k * blockIdx.x + block_offset + threadIdx.x], shared_sums[i * k + threadIdx.x]);
+            atomicAdd(&cluster_sums[i * k * num_blocks + block_offset + threadIdx.x], shared_sums[i * k + threadIdx.x]);
         }
     }
 }
@@ -217,13 +207,18 @@ void kmeans_gpu2(
     // Main loop
     cudaEventRecord(start);
     for (int iter = 0; iter < max_iter; iter++) {
+
+        // Reset the values of cluster sizes and sums
+        CUDA_CHECK(cudaMemset(res.d_cluster_sizes, 0, k * num_blocks_points.x * sizeof(int)), res);
+        CUDA_CHECK(cudaMemset(res.d_cluster_sums, 0, k * d * num_blocks_points.x * sizeof(float)), res);
+
         cudaEventRecord(start_it);
 
         // Find nearest centroids and get sums for each block
         cudaEventRecord(start_kernel1);
         kmeans_iteration<<<num_blocks_points, block_size, shared_mem_size>>>(
             res.d_points, res.d_centroids, res.d_assignments, res.d_cluster_sizes,
-            res.d_cluster_sums, N, d, k, res.d_changed);
+            res.d_cluster_sums, N, d, k, res.d_changed, num_blocks_points.x);
         
         // Check for kernel launch errors
         CUDA_CHECK(cudaGetLastError(), res);
@@ -296,10 +291,5 @@ void kmeans_gpu2(
     std::cout << "Data copying back to host: " << milliseconds << " ms" << std::endl;
     
     // Cleanup
-    CUDA_CHECK(cudaFree(res.d_points), res);
-    CUDA_CHECK(cudaFree(res.d_centroids), res);
-    CUDA_CHECK(cudaFree(res.d_assignments), res);
-    CUDA_CHECK(cudaFree(res.d_cluster_sizes), res);
-    CUDA_CHECK(cudaFree(res.d_cluster_sums), res);
-    CUDA_CHECK(cudaFree(res.d_changed), res);
+    cleanup_gpu_resources(res);
 }

@@ -1,0 +1,200 @@
+Starting k-means clustering program
+Input path: ./data/points_5mln_4d_5c.txt
+Output path: ./results/gpu2_test.txt
+Data format: TEXT
+Computation mode: GPU2
+Loading text data from ./data/points_5mln_4d_5c.txt
+Data loaded successfully in time: 8209 ms
+Number of points: 5000000
+Number of dimensions: 4
+Number of clusters: 5
+Maximum number of iterations: 100
+Starting the GPU2 version of the k-means clustering algorithm
+Data copying to device: 19.6772 ms
+Assigning nearest centroids execution time: 8.66096 ms
+Updating centroids execution time: 1.21472 ms
+Iteration 0 completed in 9.9857 ms
+Points that changed cluster: 4444678
+Assigning nearest centroids execution time: 4.86813 ms
+Updating centroids execution time: 1.16112 ms
+Iteration 1 completed in 6.10995 ms
+Points that changed cluster: 755307
+Assigning nearest centroids execution time: 4.77155 ms
+Updating centroids execution time: 1.15482 ms
+Iteration 2 completed in 6.00317 ms
+Points that changed cluster: 105050
+Assigning nearest centroids execution time: 4.72346 ms
+Updating centroids execution time: 1.15411 ms
+Iteration 3 completed in 5.95766 ms
+Points that changed cluster: 50733
+Assigning nearest centroids execution time: 4.68214 ms
+Updating centroids execution time: 1.15162 ms
+Iteration 4 completed in 5.91258 ms
+Points that changed cluster: 29702
+Assigning nearest centroids execution time: 4.66522 ms
+Updating centroids execution time: 1.15146 ms
+Iteration 5 completed in 5.89722 ms
+Points that changed cluster: 19881
+Assigning nearest centroids execution time: 4.64419 ms
+Updating centroids execution time: 1.15155 ms
+Iteration 6 completed in 5.87248 ms
+Points that changed cluster: 13994
+Assigning nearest centroids execution time: 4.64477 ms
+Updating centroids execution time: 1.15165 ms
+Iteration 7 completed in 5.8737 ms
+Points that changed cluster: 10418
+Assigning nearest centroids execution time: 4.62899 ms
+Updating centroids execution time: 1.14902 ms
+Iteration 8 completed in 5.85728 ms
+Points that changed cluster: 7934
+Assigning nearest centroids execution time: 4.61402 ms
+Updating centroids execution time: 1.14944 ms
+Iteration 9 completed in 5.84077 ms
+Points that changed cluster: 6031
+Assigning nearest centroids execution time: 4.608 ms
+Updating centroids execution time: 1.1513 ms
+Iteration 10 completed in 5.8384 ms
+Points that changed cluster: 4563
+Assigning nearest centroids execution time: 4.62234 ms
+Updating centroids execution time: 1.15136 ms
+Iteration 11 completed in 5.85229 ms
+Points that changed cluster: 3466
+Assigning nearest centroids execution time: 4.62717 ms
+Updating centroids execution time: 1.15114 ms
+Iteration 12 completed in 5.85696 ms
+Points that changed cluster: 2632
+Assigning nearest centroids execution time: 4.6121 ms
+Updating centroids execution time: 1.15066 ms
+Iteration 13 completed in 5.83974 ms
+Points that changed cluster: 1999
+Assigning nearest centroids execution time: 4.62237 ms
+Updating centroids execution time: 1.15155 ms
+Iteration 14 completed in 5.85206 ms
+Points that changed cluster: 1521
+Assigning nearest centroids execution time: 4.62157 ms
+Updating centroids execution time: 1.14976 ms
+Iteration 15 completed in 5.84912 ms
+Points that changed cluster: 1238
+Assigning nearest centroids execution time: 4.62883 ms
+Updating centroids execution time: 1.14925 ms
+Iteration 16 completed in 5.85728 ms
+Points that changed cluster: 926
+Assigning nearest centroids execution time: 4.61002 ms
+Updating centroids execution time: 1.15184 ms
+Iteration 17 completed in 5.83907 ms
+Points that changed cluster: 736
+Assigning nearest centroids execution time: 4.61027 ms
+Updating centroids execution time: 1.14989 ms
+Iteration 18 completed in 5.8409 ms
+Points that changed cluster: 541
+Assigning nearest centroids execution time: 4.60458 ms
+Updating centroids execution time: 1.15507 ms
+Iteration 19 completed in 5.87162 ms
+Points that changed cluster: 423
+Assigning nearest centroids execution time: 4.62253 ms
+Updating centroids execution time: 1.15382 ms
+Iteration 20 completed in 5.87981 ms
+Points that changed cluster: 339
+Assigning nearest centroids execution time: 4.62234 ms
+Updating centroids execution time: 1.1537 ms
+Iteration 21 completed in 5.89859 ms
+Points that changed cluster: 253
+Assigning nearest centroids execution time: 4.61619 ms
+Updating centroids execution time: 1.15312 ms
+Iteration 22 completed in 5.8703 ms
+Points that changed cluster: 221
+Assigning nearest centroids execution time: 4.62848 ms
+Updating centroids execution time: 1.1535 ms
+Iteration 23 completed in 5.8799 ms
+Points that changed cluster: 174
+Assigning nearest centroids execution time: 4.62029 ms
+Updating centroids execution time: 1.15296 ms
+Iteration 24 completed in 5.87616 ms
+Points that changed cluster: 151
+Assigning nearest centroids execution time: 4.60256 ms
+Updating centroids execution time: 1.15453 ms
+Iteration 25 completed in 5.85658 ms
+Points that changed cluster: 117
+Assigning nearest centroids execution time: 4.61622 ms
+Updating centroids execution time: 1.15437 ms
+Iteration 26 completed in 7.3808 ms
+Points that changed cluster: 87
+Assigning nearest centroids execution time: 4.62883 ms
+Updating centroids execution time: 1.15779 ms
+Iteration 27 completed in 5.90029 ms
+Points that changed cluster: 49
+Assigning nearest centroids execution time: 4.62483 ms
+Updating centroids execution time: 1.15322 ms
+Iteration 28 completed in 5.88595 ms
+Points that changed cluster: 33
+Assigning nearest centroids execution time: 4.6264 ms
+Updating centroids execution time: 1.15389 ms
+Iteration 29 completed in 5.8793 ms
+Points that changed cluster: 17
+Assigning nearest centroids execution time: 4.6153 ms
+Updating centroids execution time: 1.15376 ms
+Iteration 30 completed in 5.86762 ms
+Points that changed cluster: 13
+Assigning nearest centroids execution time: 4.61597 ms
+Updating centroids execution time: 1.15232 ms
+Iteration 31 completed in 5.86589 ms
+Points that changed cluster: 12
+Assigning nearest centroids execution time: 4.62435 ms
+Updating centroids execution time: 1.15251 ms
+Iteration 32 completed in 5.87574 ms
+Points that changed cluster: 11
+Assigning nearest centroids execution time: 4.61194 ms
+Updating centroids execution time: 1.14976 ms
+Iteration 33 completed in 5.83885 ms
+Points that changed cluster: 11
+Assigning nearest centroids execution time: 4.61837 ms
+Updating centroids execution time: 1.15043 ms
+Iteration 34 completed in 5.84704 ms
+Points that changed cluster: 13
+Assigning nearest centroids execution time: 4.62234 ms
+Updating centroids execution time: 1.1544 ms
+Iteration 35 completed in 5.87696 ms
+Points that changed cluster: 15
+Assigning nearest centroids execution time: 3.22038 ms
+Updating centroids execution time: 0.683424 ms
+Iteration 36 completed in 4.0015 ms
+Points that changed cluster: 9
+Assigning nearest centroids execution time: 2.00909 ms
+Updating centroids execution time: 0.683264 ms
+Iteration 37 completed in 2.79155 ms
+Points that changed cluster: 7
+Assigning nearest centroids execution time: 2.00909 ms
+Updating centroids execution time: 0.684032 ms
+Iteration 38 completed in 2.7895 ms
+Points that changed cluster: 2
+Assigning nearest centroids execution time: 2.0111 ms
+Updating centroids execution time: 0.682464 ms
+Iteration 39 completed in 2.79578 ms
+Points that changed cluster: 2
+Assigning nearest centroids execution time: 2.00541 ms
+Updating centroids execution time: 0.684 ms
+Iteration 40 completed in 2.78326 ms
+Points that changed cluster: 2
+Assigning nearest centroids execution time: 2.0049 ms
+Updating centroids execution time: 0.682432 ms
+Iteration 41 completed in 2.78298 ms
+Points that changed cluster: 1
+Assigning nearest centroids execution time: 2.00064 ms
+Updating centroids execution time: 0.682048 ms
+Iteration 42 completed in 2.77914 ms
+Points that changed cluster: 1
+Assigning nearest centroids execution time: 1.96637 ms
+Updating centroids execution time: 0.673824 ms
+Iteration 43 completed in 2.73408 ms
+Points that changed cluster: 1
+Assigning nearest centroids execution time: 1.96634 ms
+Updating centroids execution time: 0.673888 ms
+Iteration 44 completed in 2.73786 ms
+Points that changed cluster: 1
+Assigning nearest centroids execution time: 1.96934 ms
+No changes in assignments, stopping the algorithm
+Total execution time of the main loop: 248.405 ms
+Data copying back to host: 19.8951 ms
+K-means clustering completed in time: 1974 ms
+Starting saving the results to ./results/gpu2_test.txt
+Results saved successfully in time: 1059 ms
