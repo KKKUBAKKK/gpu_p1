@@ -98,6 +98,7 @@ __global__ void sumPoints(
     const int dimension,       // Index of the dimension
     const float* points,       // Pointer to the array of points
     const int* assignments,    // Pointer to the array of assignments
+    int* assignments_counter,  // Pointer to the counter of assignments
     float* centroids,          // Pointer to the array of centroids
     const int n_points,        // Number of points
     const int n_clusters,      // Number of clusters
@@ -107,23 +108,26 @@ __global__ void sumPoints(
 
     // Move points to shared memory (set to 0 if not assigned to the cluster)
     __shared__ float shared_points[BLOCK_SIZE];
-    __shared__ int assignments_counter;
-    if (threadIdx.x == 0) {
-        assignments_counter = 0;
-    }
+    // __shared__ int assignments_counter;
+    // if (threadIdx.x == 0) {
+    //     assignments_counter = 0;
+    // }
     if (idx < n_points) {
         if (assignments[idx] == cluster) {
-            atomicAdd(&assignments_counter, 1);
+            atomicAdd(assignments_counter, 1);
             shared_points[threadIdx.x] = points[dimension * n_points + idx];
         }
         else {
             shared_points[threadIdx.x] = 0.0f;
         }
     }
+    else {
+        shared_points[threadIdx.x] = 0.0f;
+    }
 
     __syncthreads();
 
-    if (assignments_counter == 0) {
+    if (*assignments_counter == 0) {
         return;
     }
 
@@ -133,14 +137,14 @@ __global__ void sumPoints(
             shared_points[threadIdx.x] += shared_points[threadIdx.x + i];
             shared_points[threadIdx.x + i] = 0.0f;
         }
-        if (threadIdx.x == 0 && i + i < blockDim.x) {
-            shared_points[0] += shared_points[i + i];
-            shared_points[i + i] = 0.0f;
-        }
+        // if (threadIdx.x == 0 && i + i < blockDim.x) {
+        //     shared_points[0] += shared_points[i + i];
+        //     shared_points[i + i] = 0.0f;
+        // }
         __syncthreads();
     }
     if (threadIdx.x == 0) {
-        atomicAdd(&centroids[dimension * n_clusters + cluster], shared_points[0] / assignments_counter);
+        atomicAdd(&centroids[dimension * n_clusters + cluster], shared_points[0]);// / assignments_counter);
     }
 }
 
@@ -160,14 +164,30 @@ __global__ void updateCentroids(
         int d = idx % n_dims;  // Dimension index
 
         // Sum up all points assigned to the cluster 'c' for dimension 'd' using sumPoints kernel
-        dim3 block_size(256);
+        dim3 block_size(BLOCK_SIZE);
         dim3 num_blocks_points((n_points + block_size.x - 1) / block_size.x);
         float temp = centroids[d * n_clusters + c];
         centroids[d * n_clusters + c] = 0.0f;
-        sumPoints<<<num_blocks_points, block_size>>>(c, d, points, assignments, centroids, n_points, n_clusters, n_dims);
-        if (centroids[d * n_clusters + c] == 0.0f) {
+
+        int* d_assignments_counter;
+        if (cudaMalloc(&d_assignments_counter, sizeof(int)) != cudaSuccess) {
+            return;
+        }
+        *d_assignments_counter = 0;
+
+        sumPoints<<<num_blocks_points, block_size>>>(c, d, points, assignments, d_assignments_counter, centroids, n_points, n_clusters, n_dims);
+
+        printf("Cluster %d, dimension %d, sum: %f\n", c, d, centroids[d * n_clusters + c]);
+        printf("Cluster %d, dimension %d, counter: %d\n", c, d, *d_assignments_counter);
+        
+        if (*d_assignments_counter != 0) {
+            centroids[d * n_clusters + c] /= *d_assignments_counter;
+        }
+        else {
             centroids[d * n_clusters + c] = temp;
         }
+
+        cudaFree(d_assignments_counter);
     }
 }
 
@@ -219,7 +239,7 @@ void kmeans_gpu1(
     dim3 num_blocks_centroids((k * d + block_size.x - 1) / block_size.x);
 
     // Calculate shared memory size
-    size_t shared_mem_size = (N * d + BLOCK_SIZE * d) * sizeof(float);
+    size_t shared_mem_size = (k * d + BLOCK_SIZE * d) * sizeof(float);
 
     // Create events for timing
     cudaEvent_t start_kernel1, stop_kernel1, start_kernel2, stop_kernel2;
@@ -283,6 +303,10 @@ void kmeans_gpu1(
         cudaEventElapsedTime(&milliseconds, start_it, stop_it);
         std::cout << "Iteration " << iter << " completed in " << milliseconds << " ms" << std::endl;
         std::cout << "Points that changed cluster: " << changed << std::endl;
+
+        // DEUBG: Break after 3 iterations
+        if (iter > 2)
+            break;
 
         // Setting changed back to 0
         changed = 0;
