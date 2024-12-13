@@ -95,6 +95,7 @@ float calculate_distance(
     }
     return dist;
 }
+
 int find_closest_centroid(
     const int& point,       // Input point coordinates
     const float* points,    // Array of points
@@ -115,6 +116,7 @@ int find_closest_centroid(
     }
     return best_cluster;
 }
+
 void accumulate_sum(
     const int& point,       // Input point coordinates
     const float* points,    // Array of points
@@ -129,6 +131,7 @@ void accumulate_sum(
         new_centroids[d * k + best_cluster] += points[d * N + point];
     }
 }
+
 void assign_clusters(
     const float* points,      // Input points array [N x D]
     const float* centroids,   // Centroids array [k x D]
@@ -159,6 +162,7 @@ void assign_clusters(
             accumulate_sum(i, points, new_centroids, best_cluster, N, k, D);
         }
 }
+
 void update_centroids(
     const float* new_centroids, // Array to accumulate sums for centroid updates [k x D]
     const int* cluster_sizes,   // Number of points in each cluster [k]
