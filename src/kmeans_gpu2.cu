@@ -39,11 +39,12 @@ __global__ void kmeans_iteration(
 
     // Put centroids and points in shared memory
     extern __shared__ float shmem[];
-
     float* shared_centroids = shmem;
     float* shared_sums = &shmem[k * d];
     float* shared_points = &shared_sums[k * d];
     int* shared_counts = (int*) &shared_points[points_in_block * d];
+
+    __shared__ int shared_changed;
 
     // Threads in every block with idx.x < n_clusters will each put one cluster into shared memory
     if (threadIdx.x < k) {
@@ -52,6 +53,10 @@ __global__ void kmeans_iteration(
             shared_sums[i * k + threadIdx.x] = 0.0f;
         }
         shared_counts[threadIdx.x] = 0;
+    }
+
+    if (threadIdx.x == 0) {
+        shared_changed = 0;
     }
 
     __syncthreads();
@@ -84,7 +89,7 @@ __global__ void kmeans_iteration(
 
         // Assign the point to the nearest centroid
         if (assignments[idx] != nearest_centroid) {
-            atomicAdd(changed, 1);
+            atomicAdd(&shared_changed, 1);
             assignments[idx] = nearest_centroid;
         }
         atomicAdd(&shared_counts[nearest_centroid], 1);
@@ -97,17 +102,20 @@ __global__ void kmeans_iteration(
 
     __syncthreads();
 
+    if (threadIdx.x == 0) {
+        atomicAdd(changed, shared_changed);
+    }
+
     // Store the results back to global memory
     if (threadIdx.x < k) {
         int block_offset = blockIdx.x * k;
-        atomicAdd(&cluster_sizes[block_offset + threadIdx.x], shared_counts[threadIdx.x]);
+        cluster_sizes[block_offset + threadIdx.x] = shared_counts[threadIdx.x];
         for (int i = 0; i < d; i++) {
-            atomicAdd(&cluster_sums[i * k * num_blocks + block_offset + threadIdx.x], shared_sums[i * k + threadIdx.x]);
+            cluster_sums[i * k * num_blocks + block_offset + threadIdx.x] = shared_sums[i * k + threadIdx.x];
         }
     }
 }
 
-// TODO: use shared memory or parallelize more
 // Kernel to update centroids
 __global__ void computeFinalCentroids(
     float* centroids,           // [k * d]
@@ -206,8 +214,8 @@ void kmeans_gpu2(
     for (int iter = 0; iter < max_iter; iter++) {
 
         // Reset the values of cluster sizes and sums
-        CUDA_CHECK(cudaMemset(res.d_cluster_sizes, 0, k * num_blocks_points.x * sizeof(int)), res);
-        CUDA_CHECK(cudaMemset(res.d_cluster_sums, 0, k * d * num_blocks_points.x * sizeof(float)), res);
+        // CUDA_CHECK(cudaMemset(res.d_cluster_sizes, 0, k * num_blocks_points.x * sizeof(int)), res);
+        // CUDA_CHECK(cudaMemset(res.d_cluster_sums, 0, k * d * num_blocks_points.x * sizeof(float)), res);
 
         cudaEventRecord(start_it);
 

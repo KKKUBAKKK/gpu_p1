@@ -94,77 +94,81 @@ __global__ void findNearestCentroids(
     }
 }
 
-// CUDA kernel to sum up one dimension of the points for one cluster
-__global__ void sumPoints(
-    const int cluster,         // Index of the cluster
-    const int dimension,       // Index of the dimension
-    const float* points,       // Pointer to the array of points
-    const int* assignments,    // Pointer to the array of assignments
-    int* assignments_counter,  // Pointer to the array of assignment counters
-    float* centroids,          // Pointer to the array of centroids
-    const int n_points,        // Number of points
-    const int n_clusters,      // Number of clusters
-    const int n_dims           // Number of dimensions
+// CUDA kernel to sum up all the points for all clusters and dimensions
+__global__ void sum(
+    const float* points,
+    const int* assignments,
+    int* assignments_counter,
+    float* new_centroids,
+    const int N,
+    const int k,
+    const int d
 ) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    extern __shared__ float shared_mem[];
+    float* shared_sums = shared_mem;                    // [k * d]
+    int* shared_counts = (int*)&shared_sums[k * d];    // [k]
+    
+    int tid = threadIdx.x;
+    int gid = blockIdx.x * blockDim.x + tid;
 
-    // Move points to shared memory (set to 0 if not assigned to the cluster)
-    __shared__ float shared_points[BLOCK_SIZE];
-    __shared__ int shared_assignments_counter;
-    if (threadIdx.x == 0) {
-        shared_assignments_counter = 0;
+    // Initialize shared memory
+    for (int i = tid; i < k * d; i += blockDim.x) {
+        shared_sums[i] = 0.0f;
     }
+    if (tid < k) {
+        shared_counts[tid] = 0;
+    }
+    
+    __syncthreads();
 
-    if (idx < n_points) {
-        if (assignments[idx] == cluster) {
-            atomicAdd(&shared_assignments_counter, 1);
-            shared_points[threadIdx.x] = points[dimension * n_points + idx];
+    // Process points
+    if (gid < N) {
+        int cluster = assignments[gid];
+        atomicAdd(&shared_counts[cluster], 1);
+        
+        for (int dim = 0; dim < d; dim++) {
+            float point_val = points[dim * N + gid];
+            atomicAdd(&shared_sums[dim * k + cluster], point_val);
         }
-        else {
-            shared_points[threadIdx.x] = 0.0f;
-        }
-    }
-    else {
-        shared_points[threadIdx.x] = 0.0f;
     }
 
     __syncthreads();
 
-    if (shared_assignments_counter == 0) {
-        return;
-    }
-
-    // Sum up one dimension of all the points from shared memory in parallel
-    for (int i = blockDim.x / 2; i > 0; i /= 2) {
-        if (threadIdx.x < i) {
-            shared_points[threadIdx.x] += shared_points[threadIdx.x + i];
-            shared_points[threadIdx.x + i] = 0.0f;
+    // Reduce to global memory
+    for (int i = tid; i < k * d; i += blockDim.x) {
+        int cluster = i % k;
+        int dim = i / k;
+        if (shared_sums[dim * k + cluster] != 0.0f) {
+            atomicAdd(&new_centroids[dim * k + cluster], 
+                     shared_sums[dim * k + cluster]);
         }
-        __syncthreads();
     }
 
-    if (threadIdx.x == 0) {
-        atomicAdd(&centroids[dimension * n_clusters + cluster], shared_points[0]);
-        if (dimension == 0)
-            atomicAdd(&assignments_counter[cluster], shared_assignments_counter);
+    if (tid < k && shared_counts[tid] > 0) {
+        atomicAdd(&assignments_counter[tid], shared_counts[tid]);
     }
 }
 
 __global__ void update(
     float* centroids,
     float* new_centroids,
-    const int* assignment_counters,
+    const int* assignments_counter,
     const int n_clusters,
     const int n_dims
 ) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if (idx < n_clusters * n_dims) {
-        int c = idx / n_dims;  // Cluster index
-        int d = idx % n_dims;  // Dimension index
-
-        if (assignment_counters[c] != 0) {
-            centroids[d * n_clusters + c] = new_centroids[d * n_clusters + c] / assignment_counters[c];
+    // Since n_clusters and n_dims are small (max 20x20),
+    // we can use a single block with enough threads
+    const int tid = threadIdx.x;
+    const int total_elements = n_clusters * n_dims;
+    
+    // Each thread handles multiple elements if needed
+    for (int idx = tid; idx < total_elements; idx += blockDim.x) {
+        int cluster = idx % n_clusters;
+        int dim = idx / n_clusters;
+        
+        if (assignments_counter[cluster] > 0) {
+            centroids[dim * n_clusters + cluster] = 
+                new_centroids[dim * n_clusters + cluster] / assignments_counter[cluster];
         }
     }
 }
@@ -221,6 +225,9 @@ void kmeans_gpu1(
     // Calculate shared memory size
     size_t shared_mem_size = (k * d + BLOCK_SIZE * d) * sizeof(float);
 
+    // for sum
+    size_t shared_mem_size_sum = (k * d) * sizeof(float) + k * sizeof(int);
+
     // Create events for timing
     cudaEvent_t start_kernel1, stop_kernel1, start_kernel2, stop_kernel2;
     cudaEventCreate(&start_kernel1);
@@ -267,18 +274,15 @@ void kmeans_gpu1(
         // Update centroids
         cudaEventRecord(start_kernel2);
 
-        // Sum points for each cluster and dimension in a loop using SumPoints kernel
-        for (int dim = 0; dim < d; dim++) {
-            for (int c = 0; c < k; c++) {
-                sumPoints<<<num_blocks_points, block_size>>>(c, dim, res.d_points, res.d_assignments, res.d_assignments_counter, res.d_new_centroids, N, k, d);
-            }
-            // Wait for kernel to finish and check for errors because the next dims need assignemnts counters from dim 0
-            CUDA_CHECK(cudaGetLastError(), res);
-            CUDA_CHECK(cudaDeviceSynchronize(), res);
-        }
+        // Sum all points for all clusters and dimensions using Sum kernel
+        sum<<<num_blocks_points, block_size, shared_mem_size_sum>>>(
+            res.d_points, res.d_assignments, res.d_assignments_counter, res.d_new_centroids, N, k, d);
+
+        CUDA_CHECK(cudaGetLastError(), res);
+        CUDA_CHECK(cudaDeviceSynchronize(), res);
 
         // Update centroids by dividing the sums by the number of points in each cluster
-        update<<<num_blocks_centroids, block_size>>>(res.d_centroids, res.d_new_centroids, res.d_assignments_counter, k, d);
+        update<<<1, block_size>>>(res.d_centroids, res.d_new_centroids, res.d_assignments_counter, k, d);
 
         // Check for kernel launch errors
         CUDA_CHECK(cudaGetLastError(), res);
