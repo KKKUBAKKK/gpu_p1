@@ -106,12 +106,38 @@ __global__ void kmeans_iteration(
         atomicAdd(changed, shared_changed);
     }
 
-    // Store the results back to global memory
     if (threadIdx.x < k) {
-        int block_offset = blockIdx.x * k;
-        cluster_sizes[block_offset + threadIdx.x] = shared_counts[threadIdx.x];
-        for (int i = 0; i < d; i++) {
-            cluster_sums[i * k * num_blocks + block_offset + threadIdx.x] = shared_sums[i * k + threadIdx.x];
+        atomicAdd(&cluster_sizes[threadIdx.x], shared_counts[threadIdx.x]);
+    }
+
+    for (int i = threadIdx.x; i < k * d; i += blockDim.x) {
+        int centroid = i % k;
+        int dim = i / k;
+
+        atomicAdd(&cluster_sums[dim * k + centroid], shared_sums[dim * k + centroid]);
+    }
+}
+
+__global__ void updateCentroids(
+    float* centroids,
+    float* new_centroids,
+    const int* assignments_counter,
+    const int n_clusters,
+    const int n_dims
+) {
+    // Since n_clusters and n_dims are small (max 20x20),
+    // we can use a single block with enough threads
+    const int tid = threadIdx.x;
+    const int total_elements = n_clusters * n_dims;
+    
+    // Each thread handles multiple elements if needed
+    for (int idx = tid; idx < total_elements; idx += blockDim.x) {
+        int cluster = idx % n_clusters;
+        int dim = idx / n_clusters;
+        
+        if (assignments_counter[cluster] > 0) {
+            centroids[dim * n_clusters + cluster] = 
+                new_centroids[dim * n_clusters + cluster] / assignments_counter[cluster];
         }
     }
 }
@@ -183,8 +209,8 @@ void kmeans_gpu2(
     CUDA_CHECK(cudaMalloc(&res.d_points, N * d * sizeof(float)), res);
     CUDA_CHECK(cudaMalloc(&res.d_centroids, k * d * sizeof(float)), res);
     CUDA_CHECK(cudaMalloc(&res.d_assignments, N * sizeof(int)), res);
-    CUDA_CHECK(cudaMalloc(&res.d_cluster_sizes, k * num_blocks_points.x * sizeof(int)), res);
-    CUDA_CHECK(cudaMalloc(&res.d_cluster_sums, k * d * num_blocks_points.x * sizeof(float)), res);
+    CUDA_CHECK(cudaMalloc(&res.d_cluster_sizes, k * sizeof(int)), res);
+    CUDA_CHECK(cudaMalloc(&res.d_cluster_sums, k * d * sizeof(float)), res);
     CUDA_CHECK(cudaMalloc(&res.d_changed, sizeof(int)), res);
     
     // Copy data to device
@@ -214,8 +240,8 @@ void kmeans_gpu2(
     for (int iter = 0; iter < max_iter; iter++) {
 
         // Reset the values of cluster sizes and sums
-        // CUDA_CHECK(cudaMemset(res.d_cluster_sizes, 0, k * num_blocks_points.x * sizeof(int)), res);
-        // CUDA_CHECK(cudaMemset(res.d_cluster_sums, 0, k * d * num_blocks_points.x * sizeof(float)), res);
+        CUDA_CHECK(cudaMemset(res.d_cluster_sizes, 0, k * sizeof(int)), res);
+        CUDA_CHECK(cudaMemset(res.d_cluster_sums, 0, k * d * sizeof(float)), res);
 
         cudaEventRecord(start_it);
 
@@ -249,8 +275,8 @@ void kmeans_gpu2(
         
         // Update centroids
         cudaEventRecord(start_kernel2);
-        computeFinalCentroids<<<num_blocks_centroids, block_size>>>(
-            res.d_centroids, res.d_cluster_sums, res.d_cluster_sizes, num_blocks_points.x, k, d);
+        updateCentroids<<<1, k * d>>>(
+            res.d_centroids, res.d_cluster_sums, res.d_cluster_sizes, k, d);
         cudaEventRecord(stop_kernel2);
 
         // Check for kernel launch errors

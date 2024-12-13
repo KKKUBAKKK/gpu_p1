@@ -78,7 +78,7 @@ int main(int argc, char** argv)
 
         auto start_time = std::chrono::high_resolution_clock::now();
 
-        kmeans_cpu2(points, centroids, assigned_clusters, N, D, k, MAX_ITERATIONS);
+        kmeans_cpu(points, centroids, assigned_clusters, N, D, k, MAX_ITERATIONS);
 
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
