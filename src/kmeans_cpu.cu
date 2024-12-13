@@ -77,3 +77,101 @@ void kmeans_cpu(
         iter++;
     }
 }
+
+float calculate_distance(
+    const int& point,        // Input point coordinates
+    const int& centroid,     // Centroid coordinates
+    const float* points,     // Points array
+    const float* centroids,  // Centroids array
+    const int N,             // Number of points
+    const int k,             // Number of centroids
+    const int D              // Number of dimensions
+    )
+{
+    float dist = 0.0f;
+    for (int i = 0; i < D; i++) {
+        float diff = points[i * N + point] - centroids[i * k + centroid];
+        dist += diff * diff;
+    }
+    return dist;
+}
+int find_closest_centroid(
+    const int& point,       // Input point coordinates
+    const float* points,    // Array of points
+    const float* centroids, // Array of centroids
+    const int N,            // Number of points
+    const int k,            // Number of centroids
+    const int D             // Number of dimensions
+    )
+{
+    float min_distance = INFINITY;
+    int best_cluster = 0;
+    for (int j = 0; j < k; j++) {
+        float distance = calculate_distance(point, j, points, centroids, N, k, D);
+        if (distance < min_distance) {
+            min_distance = distance;
+            best_cluster = j;
+        }
+    }
+    return best_cluster;
+}
+void accumulate_sum(
+    const int& point,       // Input point coordinates
+    const float* points,    // Array of points
+    float* new_centroids,   // Array to accumulate sums for centroid updates
+    const int best_cluster, // Index of the cluster to which the point is assigned
+    const int N,            // Number of points
+    const int k,            // Number of centroids
+    const int D             // Number of dimensions
+    )
+{
+    for (int d = 0; d < D; d++) {
+        new_centroids[d * k + best_cluster] += points[d * N + point];
+    }
+}
+void assign_clusters(
+    const float* points,      // Input points array [N x D]
+    const float* centroids,   // Centroids array [k x D]
+    float* new_centroids,     // Array to accumulate sums for centroid updates [k x D]
+    int* assigned_clusters,   // Cluster assignments [N]
+    int* cluster_sizes,       // Number of points in each cluster [k]
+    int& changed,            // Flag indicating if any assignments changed
+    const int N,              // Number of points
+    const int D,              // Dimensions
+    const int k              // Number of clusters
+    )
+{
+    // For each point find nearest centroids
+        for (int i = 0; i < N; i++) {
+            int best_cluster = 0;
+            // Find closest centroid
+            best_cluster = find_closest_centroid(i, points, centroids, N, k, D);
+            
+            // Update changed flag
+            if (assigned_clusters[i] != best_cluster)
+                changed++;
+            // Assign cluster
+            cluster_sizes[assigned_clusters[i]]--;
+            assigned_clusters[i] = best_cluster;
+            cluster_sizes[best_cluster]++;
+            
+            // Accumulate sum for centroid update
+            accumulate_sum(i, points, new_centroids, best_cluster, N, k, D);
+        }
+}
+void update_centroids(
+    const float* new_centroids, // Array to accumulate sums for centroid updates [k x D]
+    const int* cluster_sizes,   // Number of points in each cluster [k]
+    float* centroids,           // Centroids array [k x D]
+    const int D,                // Number of dimensions
+    const int k                 // Number of clusters
+    )
+{
+    for (int j = 0; j < k; j++) {
+        if (cluster_sizes[j] > 0) {
+            for (int d = 0; d < D; d++) {
+                centroids[d * k + j] = new_centroids[d * k + j] / cluster_sizes[j];
+            }
+        }
+    }
+}

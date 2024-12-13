@@ -156,8 +156,6 @@ __global__ void update(
     const int n_clusters,
     const int n_dims
 ) {
-    // Since n_clusters and n_dims are small (max 20x20),
-    // we can use a single block with enough threads
     const int tid = threadIdx.x;
     const int total_elements = n_clusters * n_dims;
     

@@ -21,7 +21,7 @@ output_file:     Path to save results
 ## CPU Implementation
 
 ### Overview
-Sequential CPU implementation of K-means clustering that serves as a baseline for performance comparison.
+Sequential CPU implementation of K-means clustering
 
 ### Algorithm
 ```python
@@ -55,6 +55,7 @@ Device (Kernels):
 1. findNearestCentroids:
     - Each thread processes one point
     - Compute distances to all centroids
+    - Find the nearest centroid
     - Atomic updates for changed assignments
 
 2. sum:
