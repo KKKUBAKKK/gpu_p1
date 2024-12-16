@@ -21,11 +21,11 @@
 
 // Kernel to find nearest centroids and update assignments
 __global__ void kmeans_iteration(
-    const float* points,        // Array of points [N x d]
-    float* centroids,           // Array of centroids [k x d]
-    int* assignments,           // Array of assignments [N]
-    int* cluster_sizes,         // Array of cluster sizes [num_blocks x k]
-    float* cluster_sums,        // Array of cluster sums [num_blocks x k x d]
+    const float* points,        // Array of points
+    float* centroids,           // Array of centroids
+    int* assignments,           // Array of assignments
+    int* cluster_sizes,         // Array of cluster sizes
+    float* cluster_sums,        // Array of cluster sums
     const int N,                // Number of points
     const int d,                // Number of dimensions
     const int k,                // Number of clusters
@@ -102,14 +102,17 @@ __global__ void kmeans_iteration(
 
     __syncthreads();
 
+    // Add changed to global memory
     if (threadIdx.x == 0) {
         atomicAdd(changed, shared_changed);
     }
 
+    // Add shared counts to global cluster sizes
     if (threadIdx.x < k) {
         atomicAdd(&cluster_sizes[threadIdx.x], shared_counts[threadIdx.x]);
     }
 
+    // Add shared sums to global cluster sums
     for (int i = threadIdx.x; i < k * d; i += blockDim.x) {
         int centroid = i % k;
         int dim = i / k;
@@ -118,64 +121,33 @@ __global__ void kmeans_iteration(
     }
 }
 
+
+// CUDA kernel that assigns the centroids values from new centroids divided by assignements counter
 __global__ void updateCentroids(
     float* centroids,
     float* new_centroids,
     const int* assignments_counter,
-    const int n_clusters,
-    const int n_dims
+    const int k,
+    const int d
 ) {
-    // Since n_clusters and n_dims are small (max 20x20),
+    // Since k and d are small (max 20x20),
     // we can use a single block with enough threads
     const int tid = threadIdx.x;
-    const int total_elements = n_clusters * n_dims;
+    const int total_elements = k * d;
     
     // Each thread handles multiple elements if needed
     for (int idx = tid; idx < total_elements; idx += blockDim.x) {
-        int cluster = idx % n_clusters;
-        int dim = idx / n_clusters;
+        int cluster = idx % k;
+        int dim = idx / k;
         
         if (assignments_counter[cluster] > 0) {
-            centroids[dim * n_clusters + cluster] = 
-                new_centroids[dim * n_clusters + cluster] / assignments_counter[cluster];
+            centroids[dim * k + cluster] = 
+                new_centroids[dim * k + cluster] / assignments_counter[cluster];
         }
     }
 }
 
-// Kernel to update centroids
-__global__ void computeFinalCentroids(
-    float* centroids,           // [k * d]
-    const float* cluster_sums,  // [num_blocks * k * d]
-    const int* cluster_sizes,   // [num_blocks * k]
-    const int num_blocks,
-    const int k,
-    const int d
-) {
-    // Each thread handles one dimension of one centroid
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= k * d) return;
-
-    int centroid_idx = idx / d;    // Which centroid
-    int dim_idx = idx % d;         // Which dimension
-
-    // Sum up partial results
-    float sum = 0.0f;
-    int count = 0;
-
-    for (int block = 0; block < num_blocks; block++) {
-        // Get partial sum for this centroid/dimension from this block
-        sum += cluster_sums[num_blocks * k * dim_idx + block * k + centroid_idx];
-        
-        // Get partial count for this centroid from this block
-        count += cluster_sizes[block * k + centroid_idx];
-    }
-
-    // Update centroid if count > 0
-    if (count > 0) {
-        centroids[dim_idx * k + centroid_idx] = sum / count;
-    }
-}
-
+// Second version of gpu KMeans algorithm
 void kmeans_gpu2(
     const float* h_points,    // Pointer to the array of points on the host
     float* h_centroids,       // Pointer to the array of centroids on the host
@@ -307,12 +279,12 @@ void kmeans_gpu2(
     cudaEventElapsedTime(&milliseconds, start, stop);
     std::cout << "Total execution time of the main loop: " << milliseconds << " ms" << std::endl;
     
-    // Copy results back to host
     cudaEvent_t start_copy_back, stop_copy_back;
     cudaEventCreate(&start_copy_back);
     cudaEventCreate(&stop_copy_back);
     cudaEventRecord(start_copy_back);
 
+    // Copy results back to host
     CUDA_CHECK(cudaMemcpy(h_centroids, res.d_centroids, k * d * sizeof(float), cudaMemcpyDeviceToHost), res);
     CUDA_CHECK(cudaMemcpy(h_assignments, res.d_assignments, N * sizeof(int), cudaMemcpyDeviceToHost), res);
 

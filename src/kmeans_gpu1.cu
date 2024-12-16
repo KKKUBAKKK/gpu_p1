@@ -37,46 +37,46 @@ __global__ void findNearestCentroids(
     const float* points,      // Pointer to the array of points
     const float* centroids,   // Pointer to the array of centroids
     int* assignments,         // Pointer to the array of assignments
-    const int n_points,       // Number of points
-    const int n_clusters,     // Number of clusters
-    const int n_dims,         // Number of dimensions
+    const int N,              // Number of points
+    const int K,              // Number of clusters
+    const int D,              // Number of dimensions
     int* changed              // Number of changed assignments
 ) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    int sidx = threadIdx.x;
+    int blockIdx = threadIdx.x;
     int points_in_block = blockDim.x;
 
     // Put centroids and points in shared memory
     extern __shared__ float shmem[];
 
     float* shared_centroids = shmem;
-    float* shared_points = &shmem[n_clusters * n_dims];
+    float* shared_points = &shmem[K * D];
 
-    // Threads in every block with idx.x < n_clusters will each put one cluster into shared memory
-    if (threadIdx.x < n_clusters) {
-        for (int i = 0; i < n_dims; i++) {
-            shared_centroids[i * n_clusters + threadIdx.x] = centroids[i * n_clusters + threadIdx.x];
+    // Threads in every block with idx.x < K will each put one cluster into shared memory
+    if (threadIdx.x < K) {
+        for (int i = 0; i < D; i++) {
+            shared_centroids[i * K + blockIdx] = centroids[i * K + blockIdx];
         }
     }
 
     __syncthreads();
 
-    if (idx < n_points) {
+    if (idx < N) {
         // Each thread puts it's own point into the shared memory
-        for (int i = 0; i < n_dims; i++) {
-            shared_points[i * points_in_block + sidx] = points[i * n_points + idx];
+        for (int i = 0; i < D; i++) {
+            shared_points[i * points_in_block + blockIdx] = points[i * N + idx];
         }
 
         float min_dist = FLT_MAX;
         int nearest_centroid = 0;
 
         // Iterate over each centroid
-        for (int c = 0; c < n_clusters; c++) {
+        for (int c = 0; c < K; c++) {
             float dist = 0.0f;
 
             // Calculate the squared Euclidean distance
-            for (int d = 0; d < n_dims; d++) {
-                float diff = shared_points[d * points_in_block + sidx] - shared_centroids[d * n_clusters + c];
+            for (int d = 0; d < D; d++) {
+                float diff = shared_points[d * points_in_block + blockIdx] - shared_centroids[d * K + c];
                 dist += diff * diff;
             }
 
@@ -94,7 +94,7 @@ __global__ void findNearestCentroids(
     }
 }
 
-// CUDA kernel to sum up all the points for all clusters and dimensions
+// CUDA kernel to sum up all the points for each cluster and dimension
 __global__ void sum(
     const float* points,
     const int* assignments,
@@ -105,8 +105,8 @@ __global__ void sum(
     const int d
 ) {
     extern __shared__ float shared_mem[];
-    float* shared_sums = shared_mem;                    // [k * d]
-    int* shared_counts = (int*)&shared_sums[k * d];    // [k]
+    float* shared_sums = shared_mem;
+    int* shared_counts = (int*)&shared_sums[k * d];
     
     int tid = threadIdx.x;
     int gid = blockIdx.x * blockDim.x + tid;
@@ -134,7 +134,7 @@ __global__ void sum(
 
     __syncthreads();
 
-    // Reduce to global memory
+    // Add shared sums to new centroids in global memory
     for (int i = tid; i < k * d; i += blockDim.x) {
         int cluster = i % k;
         int dim = i / k;
@@ -144,33 +144,35 @@ __global__ void sum(
         }
     }
 
+    // Add shared counts to assignments counter in global memory
     if (tid < k && shared_counts[tid] > 0) {
         atomicAdd(&assignments_counter[tid], shared_counts[tid]);
     }
 }
 
+// CUDA kernel to assign the new centroids divided by assignments counters to the centroids
 __global__ void update(
     float* centroids,
     float* new_centroids,
     const int* assignments_counter,
-    const int n_clusters,
-    const int n_dims
+    const int K,
+    const int D
 ) {
     const int tid = threadIdx.x;
-    const int total_elements = n_clusters * n_dims;
+    const int total_elements = K * D;
     
-    // Each thread handles multiple elements if needed
     for (int idx = tid; idx < total_elements; idx += blockDim.x) {
-        int cluster = idx % n_clusters;
-        int dim = idx / n_clusters;
+        int cluster = idx % K;
+        int dim = idx / K;
         
         if (assignments_counter[cluster] > 0) {
-            centroids[dim * n_clusters + cluster] = 
-                new_centroids[dim * n_clusters + cluster] / assignments_counter[cluster];
+            centroids[dim * K + cluster] = 
+                new_centroids[dim * K + cluster] / assignments_counter[cluster];
         }
     }
 }
 
+// First version of gpu K-Means algorithm
 void kmeans_gpu1(
     const float* h_points,    // Pointer to the array of points on the host
     float* h_centroids,       // Pointer to the array of centroids on the host
@@ -222,8 +224,6 @@ void kmeans_gpu1(
 
     // Calculate shared memory size
     size_t shared_mem_size = (k * d + BLOCK_SIZE * d) * sizeof(float);
-
-    // for sum
     size_t shared_mem_size_sum = (k * d) * sizeof(float) + k * sizeof(int);
 
     // Create events for timing
@@ -243,15 +243,10 @@ void kmeans_gpu1(
         findNearestCentroids<<<num_blocks_points, block_size, shared_mem_size>>>(
             res.d_points, res.d_centroids, res.d_assignments, N, k, d, res.d_changed);
         
-        // Check for kernel launch errors
         CUDA_CHECK(cudaGetLastError(), res);
-        
-        // Wait for kernel to finish and check for errors
         CUDA_CHECK(cudaDeviceSynchronize(), res);
 
         cudaEventRecord(stop_kernel1);
-
-        // Display kernel timing information
         cudaEventSynchronize(stop_kernel1);
         cudaEventElapsedTime(&milliseconds, start_kernel1, stop_kernel1);
         std::cout << "Assigning nearest centroids execution time: " << milliseconds << " ms" << std::endl;
@@ -265,14 +260,14 @@ void kmeans_gpu1(
             break;
         }
 
-        // Set assignemnts counter to 0
+        // Reset assignemnts counters and new centroids
         CUDA_CHECK(cudaMemset(res.d_assignments_counter, 0, k * sizeof(int)), res);
         CUDA_CHECK(cudaMemset(res.d_new_centroids, 0, k * d * sizeof(float)), res);
         
         // Update centroids
         cudaEventRecord(start_kernel2);
 
-        // Sum all points for all clusters and dimensions using Sum kernel
+        // Sum all points for all clusters and dimensions using sum kernel
         sum<<<num_blocks_points, block_size, shared_mem_size_sum>>>(
             res.d_points, res.d_assignments, res.d_assignments_counter, res.d_new_centroids, N, k, d);
 
@@ -282,15 +277,11 @@ void kmeans_gpu1(
         // Update centroids by dividing the sums by the number of points in each cluster
         update<<<1, block_size>>>(res.d_centroids, res.d_new_centroids, res.d_assignments_counter, k, d);
 
-        // Check for kernel launch errors
         CUDA_CHECK(cudaGetLastError(), res);
-        
-        // Wait for kernel to finish and check for errors
         CUDA_CHECK(cudaDeviceSynchronize(), res);
 
         cudaEventRecord(stop_kernel2);
 
-        // Display kernel timing information
         cudaEventSynchronize(stop_kernel2);
         cudaEventElapsedTime(&milliseconds, start_kernel2, stop_kernel2);
         std::cout << "Updating centroids execution time: " << milliseconds << " ms" << std::endl;
